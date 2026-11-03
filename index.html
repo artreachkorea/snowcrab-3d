@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>대게 3D, 세 가지 버전</title>
+<meta name="description" content="Opus 5.5와 Three.js로 외부 모델 없이 코드만으로 만든 인터랙티브 대게 3D 세 가지">
+<meta property="og:title" content="대게 3D, 세 가지 버전">
+<meta property="og:description" content="외부 모델 없이 코드만으로 만든 인터랙티브 대게. 바다 걷기, 사실형 뷰어, 분해 시뮬레이터.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--sea:#123f4d;--deep:#0b2a33;--ink:#eef4f2;--sub:#a3c2c4;--shell:#d9692c;--line:rgba(163,194,196,.22)}
+  *{box-sizing:border-box;margin:0}
+  body{min-height:100vh;background:linear-gradient(180deg,var(--sea),var(--deep));color:var(--ink);font-family:'IBM Plex Sans KR',system-ui,sans-serif;padding:56px 20px 40px}
+  main{max-width:880px;margin:0 auto}
+  h1{font-size:clamp(28px,5vw,44px);font-weight:700;letter-spacing:-.02em;line-height:1.15}
+  .lede{color:var(--sub);font-size:16px;line-height:1.7;margin-top:12px;max-width:60ch}
+  ol{list-style:none;padding:0;margin-top:40px;display:grid;gap:14px}
+  a.card{display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:18px;padding:20px 22px;border:1px solid var(--line);border-radius:16px;color:inherit;text-decoration:none;background:rgba(255,255,255,.03);transition:background .2s,border-color .2s}
+  a.card:hover,a.card:focus-visible{background:rgba(217,105,44,.12);border-color:var(--shell);outline:none}
+  .n{font-size:34px;font-weight:700;color:var(--shell)}
+  .card h2{font-size:19px;font-weight:600}
+  .card p{font-size:14px;color:var(--sub);margin-top:4px;line-height:1.6}
+  .go{font-size:14px;color:var(--shell);font-weight:600;white-space:nowrap}
+  footer{margin-top:40px;font-size:13px;color:var(--sub);line-height:1.7}
+  @media (max-width:560px){a.card{grid-template-columns:40px 1fr}.go{display:none}.n{font-size:26px}}
+  @media (prefers-reduced-motion:reduce){a.card{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>코드로만 빚은 대게, 세 가지 버전</h1>
+  <p class="lede">Opus 5.5와 Three.js로 만들었어요. 외부 3D 모델이나 이미지 없이 등껍질, 배, 다리 여덟 개, 집게 두 개와 관절까지 전부 코드로 생성합니다. 같은 대게를 세 가지 프롬프트로 다르게 풀었어요.</p>
+  <ol>
+    <li><a class="card" href="v1/"><span class="n">1</span><div><h2>바다 바닥 걷기</h2><p>모래 바닥과 물빛 아래에서 WASD로 게걸음. 클릭하면 집게가 딸깍.</p></div><span class="go">열기</span></a></li>
+    <li><a class="card" href="v2/"><span class="n">2</span><div><h2>사실형 표본 뷰어</h2><p>집게를 누르면 열고 닫히고, 다리를 누르면 그 다리만 움직여요.</p></div><span class="go">열기</span></a></li>
+    <li><a class="card" href="v3/"><span class="n">3</span><div><h2>분해 시뮬레이터</h2><p>부위별로 떼었다 붙이고 설명을 읽어요. 가만히 두면 자동 투어.</p></div><span class="go">열기</span></a></li>
+  </ol>
+  <footer>마우스 드래그로 회전, 휠로 줌. 모바일에서는 두 손가락으로 확대할 수 있어요.</footer>
+</main>
+</body>
+</html>

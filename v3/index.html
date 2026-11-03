@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>대게 분해 시뮬레이터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{--paper:#e6e9e4;--panel:#f6f7f3;--ink:#1d2a33;--sub:#5c6a70;--rule:#c9d0cb;--sea:#1f4e6b;--shell:#c0561e;--shell-soft:#f4dccb}
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%;overflow:hidden;background:var(--paper);font-family:'IBM Plex Sans KR',system-ui,sans-serif;color:var(--ink);-webkit-user-select:none;user-select:none}
+  #stage{position:fixed;inset:0 340px 0 0;touch-action:none}
+  #stage canvas{display:block}
+  .tag{font:600 11px 'IBM Plex Sans KR',sans-serif;color:var(--sea);background:rgba(246,247,243,.9);border:1px solid var(--rule);padding:2px 7px;border-radius:6px;white-space:nowrap;transition:opacity .25s}
+  .tag.sel{background:var(--shell);color:#fff;border-color:var(--shell)}
+  aside{position:fixed;top:0;right:0;bottom:0;width:340px;background:var(--panel);border-left:1px solid var(--rule);display:flex;flex-direction:column;overflow:hidden}
+  .scroll{overflow-y:auto;padding:24px 22px 18px;flex:1}
+  h1{font-size:22px;font-weight:700;letter-spacing:-.02em;line-height:1.25}
+  .lede{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.6}
+  dl{display:grid;grid-template-columns:auto 1fr;gap:7px 14px;margin:18px 0 6px;font-size:13px}
+  dt{color:var(--sub)}dd{font-weight:500}
+  dd i{font-style:italic;font-weight:400}
+  h2{font-size:14px;font-weight:600;margin:22px 0 10px}
+  .parts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  .parts button,.acts button{appearance:none;border:1px solid var(--rule);background:#fff;color:var(--ink);font:500 12.5px 'IBM Plex Sans KR',sans-serif;padding:8px 4px;border-radius:8px;cursor:pointer}
+  .parts .wide{grid-column:span 2}
+  .parts button:hover,.acts button:hover{border-color:var(--sea)}
+  .parts button.sel{outline:2px solid var(--shell);outline-offset:1px}
+  .parts button[aria-pressed=true]{background:var(--sea);color:#fff;border-color:var(--sea)}
+  .acts{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
+  .acts .primary{background:var(--shell);color:#fff;border-color:var(--shell)}
+  .acts button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+  button:focus-visible{outline:2px solid var(--shell);outline-offset:2px}
+  .info{margin-top:20px;padding:16px;border-radius:12px;background:#fff;border:1px solid var(--rule);min-height:150px}
+  .info h3{font-size:16px;font-weight:700}
+  .info p{font-size:13px;line-height:1.65;color:#33424a;margin-top:6px}
+  .info dl{margin:12px 0 0;font-size:12.5px}
+  .tour{position:fixed;left:16px;bottom:16px;font-size:12.5px;color:var(--sub);background:rgba(246,247,243,.85);border:1px solid var(--rule);padding:7px 12px;border-radius:999px;pointer-events:none}
+  .tour.on{color:#fff;background:var(--sea);border-color:var(--sea)}
+  .hint{position:fixed;left:16px;top:14px;font-size:12px;color:var(--sub);pointer-events:none}
+  @media (max-width:760px){
+    #stage{inset:0 0 46vh 0}
+    aside{top:auto;width:100%;height:46vh;border-left:0;border-top:1px solid var(--rule)}
+    .scroll{padding:16px 16px 14px}
+    h1{font-size:18px}.lede{display:none}
+    dl.stats{grid-template-columns:auto 1fr auto 1fr;font-size:12px;margin-top:10px}
+    .tour{bottom:calc(46vh + 10px)}
+    .parts{grid-template-columns:repeat(6,1fr)}.parts .wide{grid-column:span 3}
+  }
+  @media (prefers-reduced-motion:reduce){.tag{transition:none}}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hint">부위를 누르면 설명이 나와요</div>
+<div class="tour" id="tour">가만히 두면 자동 투어가 시작돼요</div>
+<aside>
+  <div class="scroll">
+    <h1>대게 분해 시뮬레이터</h1>
+    <p class="lede">외부 모델 없이 코드로만 만든 대게입니다. 부위별로 떼어 보고 다시 맞춰 보세요.</p>
+    <dl class="stats">
+      <dt>학명</dt><dd><i>Chionoecetes opilio</i></dd>
+      <dt>다리</dt><dd>걷는다리 8 + 집게다리 2</dd>
+      <dt>관절</dt><dd>다리마다 5곳, 모두 50곳</dd>
+      <dt>갑폭</dt><dd>수컷 약 10~15cm</dd>
+      <dt>서식</dt><dd>북태평양 찬 바다 모래·진흙 바닥</dd>
+    </dl>
+
+    <h2>부위</h2>
+    <div class="parts" id="parts"></div>
+    <div class="acts">
+      <button class="primary" id="explodeAll">전부 분리</button>
+      <button id="assembleAll">전부 조립</button>
+      <button id="motion" aria-pressed="true">관절 움직임</button>
+      <button id="clawToggle">집게 열기</button>
+    </div>
+
+    <div class="info" id="info"></div>
+  </div>
+</aside>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+// ================= SNOW CRAB CORE · 100% procedural =================
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+function hash3(x,y,z){const s=Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453123;return s-Math.floor(s);}
+function noise3(x,y,z){
+  const ix=Math.floor(x),iy=Math.floor(y),iz=Math.floor(z);
+  const fx=x-ix,fy=y-iy,fz=z-iz;
+  const u=fx*fx*(3-2*fx),v=fy*fy*(3-2*fy),w=fz*fz*(3-2*fz);
+  const L=(a,b,t)=>a+(b-a)*t, h=(a,b,c)=>hash3(ix+a,iy+b,iz+c);
+  return L(L(L(h(0,0,0),h(1,0,0),u),L(h(0,1,0),h(1,1,0),u),v),
+           L(L(h(0,0,1),h(1,0,1),u),L(h(0,1,1),h(1,1,1),u),v),w);
+}
+function fbm(x,y,z,o=4){let a=.5,f=1,s=0;for(let i=0;i<o;i++){s+=a*noise3(x*f,y*f,z*f);f*=2.03;a*=.5;}return s;}
+const smooth=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t);};
+
+const CRAB_PAL={
+  dark:new THREE.Color('#6a240c'), mid:new THREE.Color('#b44a18'), light:new THREE.Color('#dc7a38'),
+  cream:new THREE.Color('#efe0c4'), belly:new THREE.Color('#f5ebd8'), spot:new THREE.Color('#f7eddc'),
+  membrane:new THREE.Color('#d8ae80'), tip:new THREE.Color('#2a1208')
+};
+const _c=new THREE.Color(), _c2=new THREE.Color();
+
+function shellColor(out,x,y,z,ny,spot=0,dark=0){
+  const v=fbm(x*3.1+11,y*3.1,z*3.1,3);
+  _c2.copy(CRAB_PAL.dark).lerp(CRAB_PAL.mid,smooth(.22,.58,v)).lerp(CRAB_PAL.light,smooth(.58,.85,v)*.55);
+  out.copy(CRAB_PAL.cream).lerp(_c2,smooth(-.45,.25,ny));
+  if(spot>0) out.lerp(CRAB_PAL.spot,spot*smooth(-.2,.4,ny));
+  if(dark>0) out.lerp(CRAB_PAL.tip,dark);
+  return out;
+}
+function paint(g,fn){
+  g.computeVertexNormals();
+  const p=g.attributes.position,n=g.attributes.normal,col=new Float32Array(p.count*3);
+  for(let i=0;i<p.count;i++){
+    fn(_c,i,p.getX(i),p.getY(i),p.getZ(i),n.getX(i),n.getY(i),n.getZ(i));
+    col[i*3]=_c.r;col[i*3+1]=_c.g;col[i*3+2]=_c.b;
+  }
+  g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  return g;
+}
+
+function makeBumpTexture(size=256){
+  const c=document.createElement('canvas');c.width=c.height=size;const x=c.getContext('2d');
+  const img=x.createImageData(size,size);
+  for(let j=0;j<size;j++)for(let i=0;i<size;i++){
+    const v=fbm(i/size*12,j/size*12,.5,4)*200+28,k=(j*size+i)*4;
+    img.data[k]=img.data[k+1]=img.data[k+2]=v;img.data[k+3]=255;
+  }
+  x.putImageData(img,0,0);
+  const r=mulberry32(5);
+  for(let i=0;i<size*3;i++){
+    const px=r()*size,py=r()*size,rad=.6+r()*2.2;
+    const gr=x.createRadialGradient(px,py,0,px,py,rad);
+    gr.addColorStop(0,'rgba(255,255,255,.9)');gr.addColorStop(1,'rgba(255,255,255,0)');
+    x.fillStyle=gr;x.beginPath();x.arc(px,py,rad,0,7);x.fill();
+  }
+  const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(3,3);
+  return t;
+}
+let _bumpTex=null;
+function makeShellMaterial(o={}){
+  _bumpTex=_bumpTex||makeBumpTexture();
+  if(o.standard) return new THREE.MeshStandardMaterial({
+    vertexColors:true,roughness:o.roughness??.5,metalness:o.metalness??.06,
+    bumpMap:_bumpTex,bumpScale:o.bumpScale??1.4,envMapIntensity:o.envMapIntensity??1
+  });
+  return new THREE.MeshPhysicalMaterial({
+    vertexColors:true,roughness:o.roughness??.56,metalness:0,
+    clearcoat:o.clearcoat??.35,clearcoatRoughness:.42,
+    bumpMap:_bumpTex,bumpScale:o.bumpScale??1.4
+  });
+}
+
+// ---- leg / claw segment: length along +X, blade-like cross section ----
+function segmentGeo(len,r0,r1,o={}){
+  const rad=o.radial??14,hs=o.hseg??Math.max(5,Math.round(len*18)),flat=o.flat??.68,seed=o.seed??0;
+  const g=new THREE.CylinderGeometry(1,1,1,rad,hs,false);
+  const p=g.attributes.position;const T=new Float32Array(p.count);
+  for(let i=0;i<p.count;i++){
+    const cx=p.getX(i),cy=p.getY(i),cz=p.getZ(i);
+    const t=cy+.5;
+    let r=r0+(r1-r0)*Math.pow(t,o.taperPow??1);
+    r*=1+(o.bulge??.12)*Math.sin(Math.PI*t);
+    let Y=cx,Z=-cz;
+    const radial=Math.hypot(Y,Z);
+    if(radial>1e-4){
+      let d=(fbm(t*len*9+seed,Y*3,Z*3,3)-.5)*.22;
+      if(o.spines) d+=Math.pow(Math.max(0,Math.sin(t*o.spines*Math.PI*2)),10)*smooth(.55,.95,Y)*.32*(1-t*.5);
+      Y*=1+d;Z*=1+d*.6;
+    }
+    p.setXYZ(i,t*len,Y*r,Z*r*flat);T[i]=t;
+  }
+  return paint(g,(c,i,x,y,z,nx,ny)=>{
+    const spot=o.spots?smooth(.8,.86,noise3(x*34+seed,y*34,z*34))*.6:0;
+    shellColor(c,x+seed,y,z,ny,spot,o.darkTip?smooth(.72,1,T[i])*.9:0);
+  });
+}
+function knuckleGeo(r,flat=.75,seed=0){
+  const g=new THREE.SphereGeometry(r,12,10);g.scale(1,1,flat);
+  return paint(g,(c,i,x,y,z,nx,ny)=>{shellColor(c,x+seed,y,z,ny);c.lerp(CRAB_PAL.membrane,.55);});
+}
+
+// ---- carapace (dorsal shell) ----
+function carapaceGeo(o){
+  const g=new THREE.SphereGeometry(1,o.lowpoly?72:120,o.lowpoly?48:80);g.rotateX(Math.PI/2);
+  const rnd=mulberry32(o.seed||3),tub=[];
+  const N=o.lowpoly?260:420;
+  for(let i=0;i<N;i++){
+    const th=rnd()*Math.PI*2,y=Math.min(.98,Math.pow(rnd(),.75)*1.05-.1),rr=Math.sqrt(1-y*y);
+    tub.push([rr*Math.cos(th),y,rr*Math.sin(th),.012+rnd()*.022,.025+rnd()*.03]);
+  }
+  const p=g.attributes.position,B=new Float32Array(p.count);
+  for(let i=0;i<p.count;i++){
+    const x=p.getX(i),y=p.getY(i),z=p.getZ(i);
+    let b=0;
+    for(const t of tub){const dx=x-t[0],dy=y-t[1],dz=z-t[2],d2=dx*dx+dy*dy+dz*dz,w2=t[4]*t[4];if(d2<w2*9)b+=t[3]*Math.exp(-d2/w2);}
+    b*=smooth(-.12,.2,y);
+    const n=(fbm(x*4+3,y*4,z*4,4)-.5)*.05;
+    const groove=-.028*Math.exp(-Math.pow((Math.abs(z)-.3)/.06,2))*smooth(.15,.5,y)*smooth(-.6,-.2,x)*(1-smooth(.3,.62,x));
+    const cross=-.022*Math.exp(-Math.pow((x+.05-.2*z*z)/.05,2))*smooth(.25,.6,y)*(1-smooth(.22,.38,Math.abs(z)));
+    const ang=Math.atan2(z,x),rim=Math.exp(-Math.pow(y/.09,2));
+    let r=1+b+n+groove+cross+rim*.04*Math.pow(Math.max(0,Math.sin(ang*15)),6);
+    let X=x*r,Y=y*r,Z=z*r;
+    Z*=1-.13*smooth(.2,1,X);X*=.94;
+    Y*=Y>0?.5*(1-.18*z*z):.25;
+    if(x>.7){const h=Math.exp(-Math.pow((Math.abs(z)-.075)/.045,2))*smooth(.86,1,x)*smooth(-.25,.05,y)*(1-smooth(.1,.4,y));X+=.11*h;Y+=.015*h;}
+    p.setXYZ(i,X,Y,Z);B[i]=b;
+  }
+  return paint(g,(c,i,x,y,z,nx,ny)=>{
+    shellColor(c,x,y,z,ny,smooth(.018,.034,B[i])*.55);
+    if(ny>.2) c.multiplyScalar(1-.18*smooth(-.01,-.03,(fbm(x*4+3,y*4,z*4,2)-.5)*.05-.0));
+  });
+}
+
+function bellyGeo(lowpoly){
+  const g=new THREE.SphereGeometry(1,lowpoly?40:64,lowpoly?28:40);
+  const p=g.attributes.position;
+  for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i);p.setXYZ(i,x*.8,y*(y>0?.18:.22),z*.84);}
+  return paint(g,(c,i,x,y,z,nx,ny)=>{
+    c.copy(CRAB_PAL.belly).lerp(CRAB_PAL.cream,fbm(x*6,y*6,z*6,2));
+    const line=Math.pow(Math.abs(Math.sin(x*10)),10)*smooth(.1,.5,-ny);
+    c.lerp(CRAB_PAL.membrane,line*.6);
+    const mid=Math.exp(-Math.pow(z/.025,2))*smooth(.2,.6,-ny);c.lerp(CRAB_PAL.membrane,mid*.5);
+  });
+}
+function abdomenGeo(){
+  const s=new THREE.Shape();
+  s.moveTo(-.62,0);s.bezierCurveTo(-.62,.16,-.45,.2,-.3,.18);s.lineTo(.22,.06);
+  s.quadraticCurveTo(.3,0,.22,-.06);s.lineTo(-.3,-.18);s.bezierCurveTo(-.45,-.2,-.62,-.16,-.62,0);
+  const g=new THREE.ExtrudeGeometry(s,{depth:.02,bevelEnabled:true,bevelThickness:.02,bevelSize:.02,bevelSegments:3,curveSegments:16});
+  return paint(g,(c,i,x,y,z)=>{
+    c.copy(CRAB_PAL.belly);
+    const seg=Math.pow(Math.abs(Math.sin((x+.62)*15)),14);c.lerp(CRAB_PAL.membrane,seg*.5);
+    c.lerp(CRAB_PAL.light,smooth(.12,.2,Math.abs(y))*.25);
+  });
+}
+function tintedGeo(g,tint=0){return paint(g,(c,i,x,y,z,nx,ny)=>{shellColor(c,x,y,z,ny);if(tint)c.lerp(CRAB_PAL.cream,tint);});}
+
+// ---- limbs ----
+function buildLimb(mat,defs,seed,lowpoly){
+  const root=new THREE.Group(),joints=[],meshes=[];
+  let parent=root,prev=0;
+  defs.forEach((d,k)=>{
+    const j=new THREE.Group();j.position.x=prev;parent.add(j);
+    const m=new THREE.Mesh(segmentGeo(d.len,d.r0,d.r1,{...d,seed:seed*7+k*13,radial:lowpoly?10:14}),mat);
+    m.castShadow=m.receiveShadow=true;j.add(m);meshes.push(m);
+    if(k>0){const kn=new THREE.Mesh(knuckleGeo(d.r0*.92,d.flat??.7,seed+k),mat);kn.castShadow=true;j.add(kn);meshes.push(kn);}
+    joints.push(j);parent=j;prev=d.len;
+  });
+  const tip=new THREE.Object3D();tip.position.x=prev;parent.add(tip);
+  return{root,joints,meshes,tip};
+}
+
+const LEG_DEF=[
+  {x:.4, L:2.55,yaw:.62,r:.07},
+  {x:.12,L:2.95,yaw:.2, r:.074},
+  {x:-.16,L:2.85,yaw:-.22,r:.071},
+  {x:-.42,L:2.3,yaw:-.7,r:.064}
+];
+const LEG_REST=[.12,.34,-.8,-.52,-.4];
+const CLAW_REST={coxaZ:-.05,merusZ:.42,merusY:-.1,carpusY:1.0,carpusZ:-.28,palmY:.55,palmZ:-.3};
+
+function createSnowCrab(opts={}){
+  const low=!!opts.lowpoly;
+  const base=makeShellMaterial(opts);
+  const M=()=>opts.perPartMaterial?base.clone():base;
+  const eyeMat=new THREE.MeshPhysicalMaterial({color:'#0e0805',roughness:.15,clearcoat:1,clearcoatRoughness:.05});
+  const crab={root:new THREE.Group(),body:new THREE.Group(),legs:[],claws:[],parts:[],baseY:0,materials:[]};
+  crab.root.add(crab.body);
+  const tag=(obj,info)=>{obj.traverse(o=>{if(o.isMesh)o.userData.pick=info;});};
+
+  // shell group: carapace + eyes + antennae
+  const shellMat=M();crab.materials.push(shellMat);
+  const shell=new THREE.Group();crab.body.add(shell);
+  const cara=new THREE.Mesh(carapaceGeo({lowpoly:low,seed:opts.seed||3}),shellMat);
+  cara.castShadow=cara.receiveShadow=true;shell.add(cara);
+  for(const s of[1,-1]){
+    const stalk=new THREE.Group();stalk.position.set(.86,.03,s*.12);stalk.rotation.set(0,-s*.45,.55);shell.add(stalk);
+    const sm=new THREE.Mesh(segmentGeo(.13,.034,.03,{flat:.9,seed:s+20}),shellMat);sm.castShadow=true;stalk.add(sm);
+    const eye=new THREE.Mesh(new THREE.SphereGeometry(.04,16,12),eyeMat);eye.position.x=.14;eye.scale.set(1.1,1,1);stalk.add(eye);
+    const curve=new THREE.CatmullRomCurve3([new THREE.Vector3(.9,-.02,s*.04),new THREE.Vector3(1.0,.04,s*.06),new THREE.Vector3(1.1,.11,s*.11),new THREE.Vector3(1.18,.2,s*.19)]);
+    const ant=new THREE.Mesh(tintedGeo(new THREE.TubeGeometry(curve,24,.008,5,false)),shellMat);shell.add(ant);
+    const c2=new THREE.CatmullRomCurve3([new THREE.Vector3(.92,-.04,s*.02),new THREE.Vector3(1.02,0,s*.03),new THREE.Vector3(1.1,.06,s*.05)]);
+    const anl=new THREE.Mesh(tintedGeo(new THREE.TubeGeometry(c2,10,.012,5,false),.3),shellMat);shell.add(anl);
+    crab.eyes=(crab.eyes||[]).concat(stalk);crab.antennae=(crab.antennae||[]).concat(ant);
+  }
+  tag(shell,{kind:'shell'});
+  crab.parts.push({key:'shell',name:'등껍질',obj:shell,mat:shellMat});
+
+  // belly group
+  const bellyMat=M();crab.materials.push(bellyMat);
+  const belly=new THREE.Group();crab.body.add(belly);
+  const bm=new THREE.Mesh(bellyGeo(low),bellyMat);bm.position.y=-.05;bm.castShadow=bm.receiveShadow=true;belly.add(bm);
+  const ab=new THREE.Mesh(abdomenGeo(),bellyMat);ab.rotation.x=Math.PI/2;ab.position.set(-.1,-.25,0);ab.castShadow=true;belly.add(ab);
+  crab.mouth=[];
+  for(const s of[1,-1]){
+    const mp=new THREE.Mesh(tintedGeo(new THREE.BoxGeometry(.13,.022,.06,4,1,2),.2),bellyMat);
+    mp.geometry.translate(.065,0,0);mp.position.set(.58,-.13,s*.035);mp.rotation.set(0,s*.1,-.25);belly.add(mp);crab.mouth.push(mp);
+  }
+  tag(belly,{kind:'belly'});
+  crab.parts.push({key:'belly',name:'배',obj:belly,mat:bellyMat});
+
+  // walking legs
+  for(const side of[1,-1]) LEG_DEF.forEach((d,i)=>{
+    const L=d.L,r=d.r,mat=M();crab.materials.push(mat);
+    const limb=buildLimb(mat,[
+      {len:.17,r0:r*1.2,r1:r*1.1,bulge:.2,flat:.85},
+      {len:L*.4,r0:r,r1:r*.9,spines:7,spots:true},
+      {len:L*.13,r0:r*.88,r1:r*.8},
+      {len:L*.29,r0:r*.8,r1:r*.6,spines:5,spots:true},
+      {len:L*.2,r0:r*.58,r1:r*.03,bulge:.06,taperPow:.85,darkTip:true}
+    ],i+(side>0?10:20),low);
+    limb.root.position.set(d.x,-.1,side*(.8-Math.abs(d.x)*.28));
+    limb.root.rotation.y=-side*(Math.PI/2-d.yaw);
+    crab.body.add(limb.root);
+    const leg={...limb,side,i,rest:{yaw:limb.root.rotation.y,z:LEG_REST.slice()},twitch:0,mat};
+    leg.joints.forEach((j,k)=>j.rotation.z=leg.rest.z[k]);
+    const key=(side>0?'R':'L')+(i+1);
+    tag(limb.root,{kind:'leg',index:crab.legs.length,key});
+    crab.legs.push(leg);
+    crab.parts.push({key,name:(side>0?'오른쪽':'왼쪽')+' 다리 '+(i+1),obj:limb.root,mat,leg});
+  });
+
+  // claws (chelipeds)
+  for(const side of[1,-1]){
+    const mat=M();crab.materials.push(mat);
+    const limb=buildLimb(mat,[
+      {len:.14,r0:.09,r1:.085,bulge:.2,flat:.85},
+      {len:.6,r0:.078,r1:.072,spines:6,spots:true},
+      {len:.24,r0:.075,r1:.082,bulge:.2},
+      {len:.42,r0:.084,r1:.076,bulge:.2,flat:.72,spots:true}
+    ],side>0?40:50,low);
+    const palm=limb.joints[3];
+    const fixed=new THREE.Mesh(segmentGeo(.32,.048,.006,{flat:.8,bulge:.05,darkTip:true,seed:side*3+60}),mat);
+    fixed.position.set(.42,-.022,0);fixed.rotation.z=-.08;fixed.castShadow=true;palm.add(fixed);
+    const finger=new THREE.Group();finger.position.set(.41,.04,0);palm.add(finger);
+    const fm=new THREE.Mesh(segmentGeo(.34,.042,.006,{flat:.8,bulge:.08,darkTip:true,seed:side*3+70}),mat);fm.castShadow=true;finger.add(fm);
+    const fk=new THREE.Mesh(knuckleGeo(.04,.8,side+90),mat);finger.add(fk);
+    limb.root.position.set(.62,-.12,side*.42);
+    limb.root.rotation.y=-side*(Math.PI/2-1.15);
+    crab.body.add(limb.root);
+    const R=CLAW_REST,j=limb.joints;
+    j[0].rotation.z=R.coxaZ;j[1].rotation.set(0,side*R.merusY,R.merusZ);
+    j[2].rotation.set(0,side*R.carpusY,R.carpusZ);j[3].rotation.set(0,side*R.palmY,R.palmZ);
+    const claw={...limb,side,finger,open:0,target:0,snap:0,mat,meshes:[...limb.meshes,fixed,fm,fk]};
+    const key=side>0?'RC':'LC';
+    tag(limb.root,{kind:'claw',index:crab.claws.length,key});
+    crab.claws.push(claw);
+    crab.parts.push({key,name:(side>0?'오른쪽':'왼쪽')+' 집게',obj:limb.root,mat,claw});
+  }
+
+  crab.parts.forEach(p=>{p.home=p.obj.position.clone();});
+
+  crab.fitToGround=()=>{
+    crab.body.position.y=0;crab.root.updateMatrixWorld(true);
+    const v=new THREE.Vector3(),inv=crab.root.matrixWorld.clone().invert();let min=1e9;
+    crab.legs.forEach(l=>{v.setFromMatrixPosition(l.tip.matrixWorld).applyMatrix4(inv);min=Math.min(min,v.y);});
+    crab.baseY=-min+.01;crab.body.position.y=crab.baseY;
+  };
+  crab.fitToGround();
+
+  const S={phase:0,amp:0,t:0,fwd:0,lat:0,turn:0};crab.gait=S;
+  crab.update=(dt,inp={})=>{
+    dt=Math.min(dt,.05);S.t+=dt;
+    const k=Math.min(1,dt*5),f=inp.fwd||0,la=inp.lat||0,tu=inp.turn||0;
+    S.fwd+=(f-S.fwd)*k;S.lat+=(la-S.lat)*k;S.turn+=(tu-S.turn)*k;
+    const mag=Math.min(1,Math.hypot(f,la)+Math.abs(tu)*.7);
+    S.amp+=(mag-S.amp)*Math.min(1,dt*4);
+    S.phase+=dt*(1+7.5*S.amp);
+    const A=S.amp;
+    crab.legs.forEach(l=>{
+      const off=((l.i+(l.side>0?0:1))%2)*Math.PI,ph=S.phase+off;
+      const sw=Math.sin(ph),lift=Math.max(0,Math.cos(ph));
+      const idle=Math.sin(S.t*1.3+l.i*1.7+l.side)*.025;
+      const e=S.lat*l.side*sw;
+      l.twitch=Math.max(0,l.twitch-dt*1.4);
+      const tw=l.twitch>0?Math.sin(l.twitch*Math.PI)*Math.sin(S.t*18)*.5+Math.sin(l.twitch*Math.PI)*.35:0;
+      l.root.rotation.y=l.rest.yaw+A*(l.side*S.fwd*.3*sw+S.turn*.22*sw);
+      const z=l.rest.z,j=l.joints;
+      j[0].rotation.z=z[0]+A*lift*.14+idle*.4+tw*.6;
+      j[1].rotation.z=z[1]+A*(lift*.3+e*.12)+idle+tw*.3;
+      j[2].rotation.z=z[2]+A*e*.32-idle*.5;
+      j[3].rotation.z=z[3]+A*e*.16+tw*.4;
+      j[4].rotation.z=z[4]-A*lift*.18+idle*.6+tw*.5*Math.sin(S.t*22);
+    });
+    crab.claws.forEach((c,ci)=>{
+      c.snap=Math.max(0,c.snap-dt*2.2);
+      let tgt=c.target;if(c.snap>0)tgt=Math.sin(c.snap*Math.PI*2)>0?1:0;
+      c.open+=(tgt-c.open)*Math.min(1,dt*14);
+      c.finger.rotation.z=-.02+c.open*.7;
+      const sway=Math.sin(S.t*1.1+ci*2)*.04+A*Math.sin(S.phase+ci*Math.PI)*.08;
+      c.joints[1].rotation.z=CLAW_REST.merusZ+sway+c.open*.18;
+      c.joints[3].rotation.z=CLAW_REST.palmZ-sway*.6-c.open*.12;
+    });
+    crab.body.position.y=crab.baseY+A*.03*Math.sin(S.phase*2)+.006*Math.sin(S.t*1.7);
+    crab.body.rotation.x=A*.025*Math.sin(S.phase)*Math.sign(S.lat||1);
+    crab.body.rotation.z=.01*Math.sin(S.t*.9)+A*.02*Math.sin(S.phase*2+1);
+    crab.antennae.forEach((a,i)=>{a.rotation.y=Math.sin(S.t*2.3+i*1.4)*.08;a.rotation.x=Math.sin(S.t*1.7+i)*.05;});
+    crab.eyes.forEach((e,i)=>{e.rotation.x=Math.sin(S.t*.7+i*3)*.06;});
+    crab.mouth.forEach((m,i)=>{m.rotation.y=(i?-1:1)*(.1+Math.max(0,Math.sin(S.t*6+i))*.12);});
+  };
+  crab.snapClaws=(idx)=>{(idx==null?crab.claws:[crab.claws[idx]]).forEach(c=>c.snap=1);};
+  return crab;
+}
+// ================= /SNOW CRAB CORE =================
+
+
+const stage=document.getElementById('stage');
+const mobile=matchMedia('(pointer:coarse)').matches||innerWidth<760;
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});
+renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.5:2));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;
+stage.appendChild(renderer.domElement);
+const labels=new CSS2DRenderer();labels.domElement.style.cssText='position:absolute;inset:0;pointer-events:none';stage.appendChild(labels.domElement);
+
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(40,1,.1,100);
+camera.position.set(5.2,4.2,6.2);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.minDistance=2.5;controls.maxDistance=16;controls.maxPolarAngle=1.5;controls.target.set(0,.8,0);
+controls.autoRotateSpeed=1.1;
+
+scene.add(new THREE.HemisphereLight('#ffffff','#b8b2a6',1.0));
+const key=new THREE.DirectionalLight('#fff6ea',2.4);key.position.set(3,10,4);key.castShadow=true;
+key.shadow.mapSize.set(mobile?1024:2048,mobile?1024:2048);
+Object.assign(key.shadow.camera,{left:-6,right:6,top:6,bottom:-6,near:1,far:25});
+key.shadow.bias=-.0004;key.shadow.normalBias=.02;key.shadow.radius=4;scene.add(key);
+const fill=new THREE.DirectionalLight('#cfe2ee',.5);fill.position.set(-4,3,-3);scene.add(fill);
+
+const catcher=new THREE.Mesh(new THREE.PlaneGeometry(40,40).rotateX(-Math.PI/2),new THREE.ShadowMaterial({opacity:.22}));
+catcher.receiveShadow=true;scene.add(catcher);
+const grid=new THREE.GridHelper(24,48,'#9aa6a4','#c3cbc7');grid.position.y=.001;grid.material.transparent=true;grid.material.opacity=.7;scene.add(grid);
+
+const crab=createSnowCrab({lowpoly:mobile,perPartMaterial:true});
+scene.add(crab.root);
+
+// --- part metadata
+const UNIT_CM=6.5; // model carapace ≈ 2 units ≈ 13cm
+const legLen=l=>l.joints.reduce((s,j,i)=>s+(i?j.position.x:0),0)+l.tip.position.x;
+const LEG_NOTE=['맨 앞 걷는다리. 집게 바로 뒤에서 몸을 지탱해요.','가장 긴 다리 중 하나. 걸을 때 보폭을 크게 만듭니다.','둘째와 비슷하게 긴 다리. 옆걸음의 추진력을 담당해요.','가장 짧은 맨 뒤 다리. 몸 뒤쪽 균형을 잡아요.'];
+const INFO={
+  shell:{t:'등껍질 (갑각)',p:'몸통 위를 덮는 단단한 껍데기예요. 표면에 작은 돌기가 촘촘하고, 앞쪽 가운데에 짧은 이마뿔 두 개가 있어요. 눈자루와 더듬이도 이 부분에 붙어 있습니다. 탈피할 때 통째로 벗겨져요.',f:[['갑폭','수컷 약 10~15cm'],['색','위는 주황빛 갈색, 아래는 크림색'],['함께 붙은 것','눈 2, 더듬이 2쌍']]},
+  belly:{t:'배와 배딱지',p:'몸통 아래쪽 흉판과 그 위에 접혀 붙은 배딱지예요. 수컷은 좁은 삼각형, 암컷은 넓고 둥근 모양이라 암수를 구분할 때 봅니다. 이 모델은 수컷형이에요. 앞쪽에는 먹이를 다루는 턱다리가 있어요.',f:[['배딱지','수컷형 좁은 삼각형'],['입틀','턱다리 한 쌍 표현']]},
+  claw:s=>({t:(s>0?'오른쪽':'왼쪽')+' 집게다리',p:'첫 번째 다리 한 쌍이 집게로 바뀐 것이에요. 대게의 집게는 몸에 비해 가늘고 작은 편이고, 먹이를 집어 입으로 가져가요. 위쪽 손가락이 움직이고 아래 손가락은 고정돼 있어요.',f:[['마디','밑마디, 장절, 완절, 손바닥'],['관절','5곳 (움직이는 손가락 포함)'],['모델 환산 길이','약 '+Math.round(1.86*UNIT_CM)+'cm']]}),
+  leg:l=>({t:(l.side>0?'오른쪽':'왼쪽')+' 걷는다리 '+(l.i+1),p:LEG_NOTE[l.i]+' 대게라는 이름은 다리가 대나무처럼 곧고 마디진 데서 왔다는 설명이 널리 알려져 있어요.',f:[['마디','밑마디, 장절, 완절, 전절, 지절'],['관절','5곳'],['모델 환산 길이','약 '+Math.round(legLen(l)*UNIT_CM)+'cm']]})
+};
+const infoFor=p=>p.key==='shell'?INFO.shell:p.key==='belly'?INFO.belly:p.claw?INFO.claw(p.claw.side):INFO.leg(p.leg);
+
+// --- explode offsets (body space)
+crab.parts.forEach(p=>{
+  p.t=0;p.target=0;
+  if(p.key==='shell')p.off=new THREE.Vector3(0,1.45,0);
+  else if(p.key==='belly')p.off=new THREE.Vector3(0,-.55,0);
+  else{
+    const th=p.obj.rotation.y,dir=new THREE.Vector3(Math.cos(th),0,-Math.sin(th));
+    p.off=p.claw?dir.multiplyScalar(.7).add(new THREE.Vector3(.9,.35,0)):dir.multiplyScalar(.85).add(new THREE.Vector3(0,.3,0));
+  }
+  const div=document.createElement('div');div.className='tag';div.textContent=p.claw?(p.claw.side>0?'R 집게':'L 집게'):p.leg?(p.leg.side>0?'R':'L')+(p.leg.i+1):p.name;
+  p.label=new CSS2DObject(div);p.labelEl=div;
+  const anchor=p.key==='shell'?new THREE.Vector3(0,.55,0):p.key==='belly'?new THREE.Vector3(0,-.4,0):new THREE.Vector3(p.claw?.9:1.3,.15,0);
+  p.label.position.copy(anchor);p.obj.add(p.label);
+});
+
+// --- panel
+const order=['shell','belly','LC','RC','L1','L2','L3','L4','R1','R2','R3','R4'];
+const byKey=Object.fromEntries(crab.parts.map(p=>[p.key,p]));
+const partsEl=document.getElementById('parts');
+order.forEach(k=>{
+  const p=byKey[k],b=document.createElement('button');
+  b.textContent=k==='shell'?'등껍질':k==='belly'?'배':k==='LC'?'L 집게':k==='RC'?'R 집게':k;
+  if(k==='shell'||k==='belly'||k==='LC'||k==='RC')b.className='wide';
+  b.setAttribute('aria-pressed','false');b.title=p.name+' 분리/조립';
+  b.onclick=()=>{userActed();select(p);setDetached(p,!p.target);};
+  p.btn=b;partsEl.appendChild(b);
+});
+function setDetached(p,v){p.target=v?1:0;p.btn.setAttribute('aria-pressed',!!v);}
+let selected=null;
+const infoEl=document.getElementById('info');
+function select(p){
+  if(selected){selected.btn.classList.remove('sel');selected.labelEl.classList.remove('sel');selected.mat.emissive.setRGB(0,0,0);}
+  selected=p;
+  if(!p){infoEl.innerHTML='<h3>부위를 골라 보세요</h3><p>위 버튼이나 화면의 대게를 누르면 해당 부위 설명이 여기에 나와요. 버튼을 한 번 더 누르면 그 부위가 떨어지거나 다시 붙어요.</p>';return;}
+  p.btn.classList.add('sel');p.labelEl.classList.add('sel');
+  const d=infoFor(p);
+  infoEl.innerHTML='<h3>'+d.t+'</h3><p>'+d.p+'</p><dl>'+d.f.map(([a,b])=>'<dt>'+a+'</dt><dd>'+b+'</dd>').join('')+'</dl>';
+}
+select(null);
+document.getElementById('explodeAll').onclick=()=>{userActed();crab.parts.forEach(p=>setDetached(p,1));};
+document.getElementById('assembleAll').onclick=()=>{userActed();crab.parts.forEach(p=>setDetached(p,0));};
+const motionBtn=document.getElementById('motion');let motion=true;
+motionBtn.onclick=()=>{userActed();motion=!motion;motionBtn.setAttribute('aria-pressed',motion);};
+const clawBtn=document.getElementById('clawToggle');
+function setClaws(open){crab.claws.forEach(c=>c.target=open?1:0);clawBtn.textContent=open?'집게 닫기':'집게 열기';}
+clawBtn.onclick=()=>{userActed();setClaws(!crab.claws[0].target);};
+
+// --- picking
+const ray=new THREE.Raycaster(),ptr=new THREE.Vector2();let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{down=[e.clientX,e.clientY];userActed();});
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>6)return;
+  const r=renderer.domElement.getBoundingClientRect();
+  ptr.set((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1);ray.setFromCamera(ptr,camera);
+  const h=ray.intersectObject(crab.root,true).find(h=>h.object.userData.pick);
+  if(!h){select(null);return;}
+  const info=h.object.userData.pick,p=info.kind==='shell'?byKey.shell:info.kind==='belly'?byKey.belly:byKey[info.key];
+  select(p);
+  if(p.claw)p.claw.snap=1;if(p.leg)p.leg.twitch=1;
+});
+renderer.domElement.addEventListener('wheel',userActed,{passive:true});
+addEventListener('keydown',userActed);
+
+// --- auto tour (starts after idle)
+const tourEl=document.getElementById('tour');
+const IDLE=7,STEP=3.2;let idle=0,touring=false,tourT=0,tourStep=-1;
+const TOUR=[
+  ()=>{select(null);crab.parts.forEach(p=>setDetached(p,1));},
+  ()=>select(byKey.shell),
+  ()=>select(byKey.belly),
+  ()=>{select(byKey.RC);setClaws(true);},
+  ()=>{select(byKey.R2);byKey.R2.leg.twitch=1;},
+  ()=>{select(byKey.L4);byKey.L4.leg.twitch=1;setClaws(false);},
+  ()=>{select(null);crab.parts.forEach(p=>setDetached(p,0));},
+  ()=>{crab.snapClaws();},
+];
+function userActed(){
+  idle=0;
+  if(touring){touring=false;controls.autoRotate=false;tourEl.classList.remove('on');tourEl.textContent='가만히 두면 자동 투어가 시작돼요';}
+}
+function tourUpdate(dt){
+  if(!touring){idle+=dt;if(idle>IDLE){touring=true;tourT=0;tourStep=-1;controls.autoRotate=true;tourEl.classList.add('on');tourEl.textContent='자동 투어 재생 중. 화면을 누르면 멈춰요';}return;}
+  tourT+=dt;const s=Math.floor(tourT/STEP)%TOUR.length;
+  if(s!==tourStep){tourStep=s;TOUR[s]();}
+}
+
+// --- loop
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h);labels.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+resize();addEventListener('resize',resize);
+const clock=new THREE.Clock();
+function tick(){
+  const raw=clock.getDelta(),dt=Math.min(raw,.05),t=clock.elapsedTime;
+  tourUpdate(Math.min(raw,.5));
+  crab.update(dt,motion?{lat:Math.sin(t*.45)*.55}:{});
+  let maxT=0;
+  crab.parts.forEach(p=>{
+    p.t+=(p.target-p.t)*Math.min(1,dt*3.5);maxT=Math.max(maxT,p.t);
+    const e=p.t*p.t*(3-2*p.t);p.obj.position.copy(p.home).addScaledVector(p.off,e);
+    p.labelEl.style.opacity=p.t>.35||p===selected?1:0;
+  });
+  crab.root.position.y+=(maxT*.9-crab.root.position.y)*Math.min(1,dt*3);
+  if(selected)selected.mat.emissive.setRGB(.22,.08,.01).multiplyScalar(.6+.4*Math.sin(t*5));
+  controls.update();renderer.render(scene,camera);labels.render(scene,camera);requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
